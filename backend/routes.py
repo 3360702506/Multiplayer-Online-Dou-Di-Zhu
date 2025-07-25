@@ -82,7 +82,7 @@ async def lobby_websocket(websocket: WebSocket, user_id: str):
         while True:
             data = await websocket.receive_text()
             message = json.loads(data)
-            action = message.get("type")
+            action = message.get("action", message.get("type"))
             
             if action == "get_public_rooms":
                 await websocket.send_text(json.dumps({
@@ -98,8 +98,8 @@ async def lobby_websocket(websocket: WebSocket, user_id: str):
                     room_id = generate_room_id()
                 
                 rooms[room_id] = {
-                    "players": [],
-                    "player_names": {},
+                    "players": [user_id],  # 自动将创建者添加为玩家
+                    "player_names": {user_id: player_name},
                     "is_public": is_public,
                     "websockets": {},
                     "game_state": "waiting",
@@ -116,29 +116,37 @@ async def lobby_websocket(websocket: WebSocket, user_id: str):
                 
                 await websocket.send_text(json.dumps({
                     "type": "room_created",
+                    "success": True,
                     "room_id": room_id
                 }))
                 
                 # 广播新房间信息给所有大厅连接
                 if is_public:
                     for conn_id, connection in lobby_connections.items():
-                        if conn_id != user_id:  # 不发送给创建者
-                            try:
-                                await connection.send_text(json.dumps({
-                                    "type": "public_rooms_update",
-                                    "rooms": await get_public_rooms_list()
-                                }))
-                            except:
-                                pass
+                        try:
+                            await connection.send_text(json.dumps({
+                                "type": "public_rooms_update",
+                                "rooms": await get_public_rooms_list()
+                            }))
+                        except:
+                            pass
             
             elif action == "join_room":
                 room_id = message.get("room_id")
                 player_name = message.get("player_name", "玩家")
                 if room_id in rooms:
-                    await websocket.send_text(json.dumps({
-                        "type": "join_success",
-                        "room_id": room_id
-                    }))
+                    room = rooms[room_id]
+                    if len(room["players"]) < 3:
+                        await websocket.send_text(json.dumps({
+                            "type": "join_success",
+                            "success": True,
+                            "room_id": room_id
+                        }))
+                    else:
+                        await websocket.send_text(json.dumps({
+                            "type": "error",
+                            "message": "房间已满"
+                        }))
                 else:
                     await websocket.send_text(json.dumps({
                         "type": "error",
@@ -314,7 +322,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
                         room["bid_turn_index"] = (room["bid_turn_index"] + 1) % 3
                         await trigger_next_action(room_id)
 
-            elif action == "play_cards":
+            elif action == "play":
                 player_index = room["players"].index(user_id)
                 if room["game_state"] == "playing" and player_index == room["turn_index"]:
                     cards_played = message.get("cards", [])
@@ -328,32 +336,43 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, user_id: str):
                     
                     if valid_play and cards_played:
                         # Remove cards from hand
-                        new_hand = [c for c in room["player_hands"][user_id] if c not in room["last_played_hand"]]
+                        new_hand = [c for c in room["player_hands"][user_id] if c not in cards_played]
                         room["player_hands"][user_id] = new_hand
                         
                         room["last_played_hand"] = cards_played
                         room["played_cards"].extend(cards_played) # Record played cards
                         
+                        # 计算每个玩家的手牌数量
+                        player_cards = {player_id: len(hand) for player_id, hand in room["player_hands"].items()}
+                        
                         # Send updated hand back to the player
-                        await websocket.send_text(json.dumps({"type": "update_hand", "hand": new_hand}))
+                        await websocket.send_text(json.dumps({
+                            "type": "update_hand", 
+                            "hand": new_hand
+                        }))
 
                         await manager.broadcast(json.dumps({
                             "type": "cards_played",
                             "player": user_id,
                             "cards": cards_played,
-                            "remaining_cards": len(new_hand),
-                            "played_cards_tracker": room["played_cards"] # Broadcast the tracker
+                            "player_cards": player_cards
                         }), room_id)
                         
                         if not new_hand:
                             room["game_state"] = "finished"
-                            await manager.broadcast(json.dumps({"type": "game_over", "winner": user_id}), room_id)
+                            await manager.broadcast(json.dumps({
+                                "type": "game_over", 
+                                "winner": user_id
+                            }), room_id)
                             # TODO: Add logic to reset room
                         else:
                             room["turn_index"] = (room["turn_index"] + 1) % 3
                             await trigger_next_action(room_id)
                     else:
-                        await websocket.send_text(json.dumps({"type": "error", "message": "无效的出牌"}))
+                        await websocket.send_text(json.dumps({
+                            "type": "error", 
+                            "message": "无效的出牌"
+                        }))
 
             elif action == "pass":
                 player_index = room["players"].index(user_id)

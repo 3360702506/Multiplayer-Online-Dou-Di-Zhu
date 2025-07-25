@@ -132,6 +132,72 @@ body {
     margin-left: 1rem;
 }
 
+/* 公开房间列表样式 */
+#public-rooms-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.room-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #f8f9fa;
+    border-radius: var(--border-radius);
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.room-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.room-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.room-id {
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.room-players {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.join-public-room-btn {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    padding: 8px 15px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.join-public-room-btn:hover {
+    background-color: var(--primary-color-dark);
+}
+
+.no-rooms-message {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    font-style: italic;
+    background-color: #f8f9fa;
+    border-radius: var(--border-radius);
+}
+
 /* 保留原有样式 */
 #game-room-wrapper {
     display: none; /* Hide by default */
@@ -358,16 +424,16 @@ button:hover {
     height: 30px;
 }
 
+/* 记牌器样式 */
 #card-tracker-container {
     position: fixed; /* Fixed position relative to the viewport */
-    top: 50%;
-    transform: translateY(-50%);
+    top: 100px;
     left: 20px;
     width: 220px;
     height: auto;
     max-height: 80vh;
     flex-shrink: 0; /* Prevent from shrinking */
-    background: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.9);
     backdrop-filter: blur(10px);
     border-radius: var(--border-radius);
     box-shadow: var(--card-shadow);
@@ -375,14 +441,44 @@ button:hover {
     overflow: hidden;
     color: var(--text-color);
     z-index: 200;
+    transition: all 0.3s ease;
 }
 
-#card-tracker-container h3 {
-    text-align: center;
-    margin-top: 0;
+#card-tracker-container.collapsed {
+    height: 60px;
+    overflow: hidden;
+}
+
+.card-tracker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 1rem;
     padding-bottom: 0.5rem;
     border-bottom: 1px solid #e2e8f0;
+}
+
+.card-tracker-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.toggle-btn {
+    background-color: transparent;
+    border: 1px solid var(--primary-color);
+    color: var(--primary-color);
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+    background-color: var(--primary-color);
+    color: white;
+    transform: none;
+    box-shadow: none;
 }
 
 #card-tracker {
@@ -394,21 +490,36 @@ button:hover {
     overflow-y: auto;
 }
 
-.tracker-item {
+.card-tracker-item {
     display: flex;
-    justify-content: center;
     align-items: center;
-    padding: 0.25rem;
+    justify-content: space-between;
+    background-color: #f8f9fa;
+    padding: 0.3rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
 }
 
-.tracker-item.is-king {
-    grid-column: span 2;
+.card-tracker-item .card-name {
+    display: flex;
+    align-items: center;
 }
-.tracker-item.is-red-joker { color: #ef4444; }
 
-.tracker-item.out-of-play {
-    color: #cbd5e0;
-    text-decoration: line-through;
+.card-tracker-item .card-count {
+    font-weight: bold;
+    background-color: #e2e8f0;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    min-width: 1.5rem;
+    text-align: center;
+}
+
+.card-tracker-item.hearts, .card-tracker-item.diamonds {
+    color: #e53e3e;
+}
+
+.card-tracker-item.spades, .card-tracker-item.clubs {
+    color: #2d3748;
 }
 
 /* 游戏按钮样式 */
@@ -480,7 +591,21 @@ button:hover {
     flex-direction: column;
     overflow: hidden;
     z-index: 200;
+}
+
+#chat-container .chat-header {
+    padding: 10px;
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: bold;
     cursor: grab;
+    text-align: center;
+    border-top-left-radius: var(--border-radius);
+    border-top-right-radius: var(--border-radius);
+}
+
+#chat-container .chat-header:active {
+    cursor: grabbing;
 }
 
 #chat-messages {
@@ -490,7 +615,7 @@ button:hover {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    height: calc(100% - 50px);
+    height: calc(100% - 110px);
 }
 
 #chat-input-container {
@@ -498,6 +623,8 @@ button:hover {
     border-top: 1px solid #e2e8f0;
     padding: 0.5rem;
     background-color: white;
+    height: 60px;
+    min-height: 60px;
 }
 
 #chat-input {
@@ -507,11 +634,44 @@ button:hover {
     padding: 0.5rem;
     background: white;
     margin-right: 0.5rem;
+    font-size: 1rem;
+    outline: none;
 }
 
 #chat-input:focus {
     outline: none;
     border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(90, 103, 216, 0.2);
+}
+
+/* 聊天消息样式 */
+.chat-message {
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    max-width: 85%;
+    word-break: break-word;
+}
+
+.chat-message.is-you {
+    background-color: var(--primary-color);
+    color: white;
+    align-self: flex-end;
+}
+
+.chat-message.is-other {
+    background-color: #e2e8f0;
+    color: var(--text-color);
+    align-self: flex-start;
+}
+
+.chat-message .sender {
+    font-weight: 700;
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+}
+
+.chat-message .content {
+    font-size: 0.95rem;
 }
 
 #send-chat-btn {
@@ -669,11 +829,10 @@ button#add-bot-btn:hover {
 #main-game-area {
     position: relative;
     width: 100%;
-    height: 80vh;
+    height: calc(100vh - 100px);
     display: flex;
-    flex-direction: column;
+    justify-content: center;
     align-items: center;
-    padding-top: 60px; /* 为顶部的游戏头部留出空间 */
 }
 
 #player-left {
@@ -697,11 +856,10 @@ button#add-bot-btn:hover {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 400px;
     display: flex;
     flex-direction: column;
-    gap: 2rem;
     align-items: center;
+    width: 60%;
     z-index: 5;
 }
 
@@ -710,7 +868,7 @@ button#add-bot-btn:hover {
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    width: 80%;
+    width: 70%;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -758,16 +916,57 @@ button#add-bot-btn:hover {
     height: 30px;
 }
 
-/* 机器人标签样式 */
+/* 机器人标签 */
 .bot-tag {
     display: inline-block;
-    background-color: #4299e1;
+    background-color: rgba(52, 152, 219, 0.8);
     color: white;
-    font-size: 0.8rem;
-    padding: 0.1rem 0.4rem;
+    font-size: 0.7rem;
+    padding: 2px 5px;
     border-radius: 4px;
-    margin-right: 0.4rem;
-    font-weight: normal;
+    margin-left: 5px;
+    vertical-align: middle;
+}
+
+/* 玩家状态样式 */
+.player-name {
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 5px 10px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.player-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.cards-count {
+    font-size: 1.2rem;
+    font-weight: bold;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 5px 10px;
+    border-radius: 10px;
+    min-width: 30px;
+    text-align: center;
+}
+
+/* 地主标识 */
+.is-landlord .player-name::after {
+    content: "地主";
+    display: inline-block;
+    background-color: #e74c3c;
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 5px;
+    border-radius: 4px;
+    margin-left: 5px;
+    vertical-align: middle;
 }
 
 /* 叫地主对话框样式 */
@@ -808,4 +1007,243 @@ button#add-bot-btn:hover {
 
 .bid-buttons button {
     min-width: 120px;
+}
+
+/* 地主牌样式 */
+#landlord-cards-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.landlord-cards-label {
+    font-size: 1rem;
+    font-weight: bold;
+    color: #e74c3c;
+    margin-bottom: 5px;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 2px 10px;
+    border-radius: 10px;
+}
+
+#landlord-cards-display {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+}
+
+/* 出牌提示和计时器 */
+#player-status {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 10px;
+    height: 40px;
+}
+
+#turn-indicator {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    background-color: rgba(231, 76, 60, 0.9);
+    color: white;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-weight: bold;
+    animation: pulse 1.5s infinite;
+    z-index: 100;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+#turn-indicator.hidden {
+    display: none;
+}
+
+#timer {
+    font-weight: bold;
+    margin: 0 3px;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* 游戏消息样式 */
+.game-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    z-index: 100;
+    animation: fadeIn 0.3s, fadeOut 0.3s 2.7s;
+    text-align: center;
+    max-width: 80%;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+/* 出牌区域样式 */
+#played-cards-display {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 20px;
+    min-height: 120px;
+}
+
+.played-cards-player {
+    font-size: 1rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 5px;
+    background-color: rgba(255, 255, 255, 0.8);
+    padding: 2px 10px;
+    border-radius: 10px;
+}
+
+.played-card {
+    margin: 0 2px;
+    transform: scale(0.9);
+}
+
+/* 出牌指示器样式 */
+.played-card-indicator {
+    font-size: 0.9rem;
+    font-weight: bold;
+    padding: 3px 8px;
+    border-radius: 10px;
+    margin-top: 5px;
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.played-card-indicator.active {
+    opacity: 1;
+    animation: fadeInOut 2s forwards;
+}
+
+.played-card-indicator.play {
+    background-color: rgba(46, 204, 113, 0.8);
+    color: white;
+}
+
+.played-card-indicator.pass {
+    background-color: rgba(231, 76, 60, 0.8);
+    color: white;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* 弹窗样式 */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow-y: auto;
+    border-radius: var(--border-radius);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.close-modal {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-modal:hover,
+.close-modal:focus {
+    color: black;
+    text-decoration: none;
+}
+
+.rules-content {
+    margin-top: 20px;
+    line-height: 1.6;
+}
+
+.rules-content h3 {
+    margin-top: 20px;
+    color: var(--primary-color);
+    border-bottom: 1px solid #eee;
+    padding-bottom: 5px;
+}
+
+.rules-content ul,
+.rules-content ol {
+    margin-left: 20px;
+    margin-bottom: 15px;
+}
+
+.rules-content li {
+    margin-bottom: 8px;
+}
+
+.rules-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 15px 0;
+}
+
+.rules-content table, 
+.rules-content th, 
+.rules-content td {
+    border: 1px solid #ddd;
+}
+
+.rules-content th, 
+.rules-content td {
+    padding: 8px;
+    text-align: left;
+}
+
+.rules-content th {
+    background-color: #f2f2f2;
 }

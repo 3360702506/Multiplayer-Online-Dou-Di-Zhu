@@ -1,55 +1,227 @@
+// 全局变量
+let websocket;
+let roomId = sessionStorage.getItem('roomId');
+let userId = sessionStorage.getItem('userId');
+let playerName = sessionStorage.getItem('playerName') || '玩家';
+let isMyTurn = false;
+let myCards = [];
+let selectedCards = [];
+let turnTimer = null;
+let timeLeft = 20;
+let gameState = null;
+
 document.addEventListener('DOMContentLoaded', () => {
-    // --- 元素获取 ---
+    // 初始化页面
+    initializePage();
+});
+
+// 初始化页面
+function initializePage() {
+    if (!roomId || !userId) {
+        alert('会话信息缺失，请返回大厅重新加入游戏');
+        window.location.href = 'index.html';
+        return;
+    }
+
+    // 获取DOM元素
     const roomIdDisplay = document.getElementById('room-id-display');
-    const startGameBtn = document.getElementById('start-game-btn');
-    const leaveRoomBtn = document.getElementById('leave-room-btn');
-    const addBotBtn = document.getElementById('add-bot-btn');
+    const playerYouDiv = document.getElementById('player-you');
+    const playerLeftDiv = document.getElementById('player-left');
+    const playerRightDiv = document.getElementById('player-right');
     const playCardsBtn = document.getElementById('play-cards-btn');
     const passBtn = document.getElementById('pass-btn');
-    const playerYouDiv = document.getElementById('player-you');
-    const playerYouName = playerYouDiv.querySelector('.player-name');
-    const myHandContainer = playerYouDiv.querySelector('.cards-hand');
+    const leaveRoomBtn = document.getElementById('leave-room-btn');
+    const addBotBtn = document.getElementById('add-bot-btn');
+    const startGameBtn = document.getElementById('start-game-btn');
     const chatContainer = document.getElementById('chat-container');
-    const chatMessages = document.getElementById('chat-messages');
-    const chatInput = document.getElementById('chat-input');
-    const sendChatBtn = document.getElementById('send-chat-btn');
     const cardTrackerContainer = document.getElementById('card-tracker-container');
-    const cardTracker = document.getElementById('card-tracker');
-    const landlordCardsDisplay = document.getElementById('landlord-cards-display');
-    const playedCardsDisplay = document.getElementById('played-cards-display');
-    const playerLeft = document.getElementById('player-left');
-    const playerLeftName = playerLeft.querySelector('.player-name');
-    const playerRight = document.getElementById('player-right');
-    const playerRightName = playerRight.querySelector('.player-name');
+    const turnIndicator = document.getElementById('turn-indicator');
+    const timerElement = document.getElementById('timer');
 
-    // --- 状态变量 ---
-    let websocket = null;
-    let roomId = sessionStorage.getItem('roomId');
-    let userId = sessionStorage.getItem('userId');
-    let playerName = sessionStorage.getItem('playerName') || '玩家';
-    let selectedCards = [];
-    let myCards = [];
-    let isMyTurn = false;
-    let lastPlayedCards = null;
-    let lastPlayerId = null;
-    let gameState = null;
+    // 设置房间ID和玩家名称
+    roomIdDisplay.textContent = roomId;
+    playerYouDiv.querySelector('.player-name').textContent = playerName;
+    
+    // 添加事件监听
+    if (leaveRoomBtn) leaveRoomBtn.addEventListener('click', leaveRoom);
+    if (addBotBtn) addBotBtn.addEventListener('click', addBot);
+    if (startGameBtn) startGameBtn.addEventListener('click', startGame);
+    if (playCardsBtn) playCardsBtn.addEventListener('click', playCards);
+    if (passBtn) passBtn.addEventListener('click', passPlay);
+    
+    // 初始化聊天功能
+    initChatFeature();
+    
+    // 使聊天窗口可拖动
+    if (chatContainer) makeDraggable(chatContainer);
+    if (cardTrackerContainer) {
+        makeDraggable(cardTrackerContainer);
+        initCardTrackerToggle();
+    }
+    
+    // 初始化记牌器
+    initCardTracker();
+    
+    // 初始化WebSocket连接
+    initWebSocket();
+}
 
-    // 初始化页面
-    function initializePage() {
-        if (!roomId || !userId) {
-            alert('会话信息缺失，请返回大厅重新加入游戏');
-            window.location.href = 'index.html';
-            return;
+// 初始化聊天功能
+function initChatFeature() {
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    
+    if (chatForm) {
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            sendChatMessage();
+        });
+    }
+    
+    if (chatInput) {
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        });
+    }
+}
+    
+    // 初始化记牌器伸缩功能
+    function initCardTrackerToggle() {
+        const toggleBtn = document.getElementById('toggle-card-tracker');
+        
+        toggleBtn.addEventListener('click', () => {
+            cardTrackerContainer.classList.toggle('collapsed');
+            
+            if (cardTrackerContainer.classList.contains('collapsed')) {
+                toggleBtn.textContent = '展开';
+            } else {
+                toggleBtn.textContent = '收起';
+            }
+        });
+    }
+
+    // 初始化记牌器
+    function initCardTracker() {
+        const cardTracker = document.getElementById('card-tracker');
+        cardTracker.innerHTML = '';
+        
+        // 初始化扑克牌记录
+        const suits = ['♠', '♥', '♣', '♦'];
+        const ranks = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
+        const suitClasses = ['spades', 'hearts', 'clubs', 'diamonds'];
+        
+        // 添加普通牌
+        for (let rank of ranks) {
+            for (let i = 0; i < suits.length; i++) {
+                const suit = suits[i];
+                const suitClass = suitClasses[i];
+                
+                const item = document.createElement('div');
+                item.className = `card-tracker-item ${suitClass}`;
+                item.dataset.rank = rank;
+                item.dataset.suit = suit;
+                
+                const cardName = document.createElement('div');
+                cardName.className = 'card-name';
+                cardName.textContent = `${rank}${suit}`;
+                
+                const cardCount = document.createElement('div');
+                cardCount.className = 'card-count';
+                cardCount.textContent = '1';  // 每种牌初始为1张
+                
+                item.appendChild(cardName);
+                item.appendChild(cardCount);
+                cardTracker.appendChild(item);
+            }
         }
-
-        roomIdDisplay.textContent = roomId;
-        playerYouName.textContent = playerName;
         
-        // 使聊天窗口可拖动
-        makeDraggable(chatContainer);
+        // 添加大小王
+        const jokers = [
+            { name: '小王', class: 'black-joker' },
+            { name: '大王', class: 'red-joker' }
+        ];
         
-        // 初始化WebSocket连接
-        initWebSocket();
+        for (let joker of jokers) {
+            const item = document.createElement('div');
+            item.className = `card-tracker-item ${joker.class}`;
+            
+            const cardName = document.createElement('div');
+            cardName.className = 'card-name';
+            cardName.textContent = joker.name;
+            
+            const cardCount = document.createElement('div');
+            cardCount.className = 'card-count';
+            cardCount.textContent = '1';  // 每种王初始为1张
+            
+            item.appendChild(cardName);
+            item.appendChild(cardCount);
+            cardTracker.appendChild(item);
+        }
+    }
+    
+    // 更新记牌器
+    function updateCardTracker(playedCards) {
+        if (!playedCards || !playedCards.length) return;
+        
+        // 遍历出的牌，减少记牌器中的数量
+        playedCards.forEach(card => {
+            let selector;
+            
+            if (typeof card === 'object' && card !== null) {
+                // 对象格式的卡牌
+                if (card.suit === 'Joker') {
+                    // 大小王
+                    selector = card.rank === 'Red' ? '.card-tracker-item.red-joker' : '.card-tracker-item.black-joker';
+                } else {
+                    // 普通牌
+                    const suitMap = {
+                        '♠': 'spades',
+                        '♥': 'hearts',
+                        '♣': 'clubs',
+                        '♦': 'diamonds',
+                        'spades': 'spades',
+                        'hearts': 'hearts',
+                        'clubs': 'clubs',
+                        'diamonds': 'diamonds'
+                    };
+                    
+                    const suitClass = suitMap[card.suit] || '';
+                    selector = `.card-tracker-item.${suitClass}[data-rank="${card.rank}"][data-suit="${card.suit}"]`;
+                }
+            } else if (typeof card === 'string') {
+                // 字符串格式的卡牌
+                if (card.includes('joker')) {
+                    selector = card.includes('red') ? '.card-tracker-item.red-joker' : '.card-tracker-item.black-joker';
+                } else {
+                    // 普通牌，格式可能是 "A_of_hearts" 或其他
+                    // 这里需要根据实际的字符串格式进行解析
+                    // 简化处理，假设格式是 "rank_of_suit"
+                    const parts = card.split('_of_');
+                    if (parts.length === 2) {
+                        const rank = parts[0].toUpperCase();
+                        const suit = parts[1];
+                        selector = `.card-tracker-item.${suit}[data-rank="${rank}"]`;
+                    }
+                }
+            }
+            
+            // 更新记牌器
+            if (selector) {
+                const item = document.querySelector(selector);
+                if (item) {
+                    const countElement = item.querySelector('.card-count');
+                    if (countElement) {
+                        const currentCount = parseInt(countElement.textContent);
+                        if (currentCount > 0) {
+                            countElement.textContent = (currentCount - 1).toString();
+                        }
+                    }
+                }
+            }
+        });
     }
 
     // 初始化WebSocket连接
@@ -114,33 +286,153 @@ document.addEventListener('DOMContentLoaded', () => {
         alert('游戏开始！等待发牌...');
     }
 
-    // 更新玩家名称
+    // 更新玩家名称和状态
     function updatePlayerNames(players, playerNames) {
-        if (!players || !playerNames) return;
+        // 清除之前的玩家ID
+        playerLeftDiv.dataset.playerId = '';
+        playerRightDiv.dataset.playerId = '';
         
-        console.log('更新玩家名称:', players, playerNames);
+        // 重置玩家名称
+        playerLeftDiv.querySelector('.player-name').textContent = '玩家1';
+        playerRightDiv.querySelector('.player-name').textContent = '玩家2';
         
-        // 找到自己和其他玩家
-        const otherPlayers = players.filter(id => id !== userId);
+        // 移除地主标识
+        playerLeftDiv.classList.remove('is-landlord');
+        playerRightDiv.classList.remove('is-landlord');
+        playerYouDiv.classList.remove('is-landlord');
         
-        // 更新其他玩家名称
+        // 过滤出其他玩家（非当前用户）
+        const otherPlayers = players.filter(player => player !== userId);
+        
+        // 设置玩家名称和ID
         if (otherPlayers.length > 0) {
-            const player1Id = otherPlayers[0];
-            const name = playerNames[player1Id] || '玩家1';
-            playerLeftName.textContent = name;
-            // 如果是机器人，添加机器人标识
-            if (player1Id.startsWith('bot_')) {
-                playerLeftName.innerHTML = `<span class="bot-tag">机器人</span> ${name}`;
+            playerLeftDiv.dataset.playerId = otherPlayers[0];
+            const leftName = playerNames && playerNames[otherPlayers[0]] ? playerNames[otherPlayers[0]] : otherPlayers[0];
+            playerLeftDiv.querySelector('.player-name').textContent = leftName;
+            
+            // 如果是机器人，添加标识
+            if (otherPlayers[0].startsWith('bot_')) {
+                const nameElement = playerLeftDiv.querySelector('.player-name');
+                if (!nameElement.querySelector('.bot-tag')) {
+                    const botTag = document.createElement('span');
+                    botTag.className = 'bot-tag';
+                    botTag.textContent = '机器人';
+                    nameElement.appendChild(botTag);
+                }
             }
         }
         
         if (otherPlayers.length > 1) {
-            const player2Id = otherPlayers[1];
-            const name = playerNames[player2Id] || '玩家2';
-            playerRightName.textContent = name;
-            // 如果是机器人，添加机器人标识
-            if (player2Id.startsWith('bot_')) {
-                playerRightName.innerHTML = `<span class="bot-tag">机器人</span> ${name}`;
+            playerRightDiv.dataset.playerId = otherPlayers[1];
+            const rightName = playerNames && playerNames[otherPlayers[1]] ? playerNames[otherPlayers[1]] : otherPlayers[1];
+            playerRightDiv.querySelector('.player-name').textContent = rightName;
+            
+            // 如果是机器人，添加标识
+            if (otherPlayers[1].startsWith('bot_')) {
+                const nameElement = playerRightDiv.querySelector('.player-name');
+                if (!nameElement.querySelector('.bot-tag')) {
+                    const botTag = document.createElement('span');
+                    botTag.className = 'bot-tag';
+                    botTag.textContent = '机器人';
+                    nameElement.appendChild(botTag);
+                }
+            }
+        }
+        
+        // 设置自己的名称
+        if (playerNames && playerNames[userId]) {
+            playerYouDiv.querySelector('.player-name').textContent = playerNames[userId];
+        } else {
+            playerYouDiv.querySelector('.player-name').textContent = playerName;
+        }
+    }
+    
+    // 更新游戏状态
+    function updateGameState(state) {
+        if (!state) return;
+        
+        gameState = state;
+        
+        // 更新玩家手牌数量
+        if (state.player_cards) {
+            updatePlayerCardCounts(state.player_cards);
+        }
+        
+        // 更新地主标识
+        if (state.landlord) {
+            // 移除之前的地主标识
+            playerLeftDiv.classList.remove('is-landlord');
+            playerRightDiv.classList.remove('is-landlord');
+            playerYouDiv.classList.remove('is-landlord');
+            
+            // 添加新的地主标识
+            if (state.landlord === userId) {
+                playerYouDiv.classList.add('is-landlord');
+            } else if (state.landlord === playerLeftDiv.dataset.playerId) {
+                playerLeftDiv.classList.add('is-landlord');
+            } else if (state.landlord === playerRightDiv.dataset.playerId) {
+                playerRightDiv.classList.add('is-landlord');
+            }
+        }
+        
+        // 更新地主牌
+        if (state.landlord_cards) {
+            updateLandlordCards(state.landlord_cards);
+        }
+        
+        // 更新最后出的牌
+        if (state.last_played_cards && state.last_played_by) {
+            updatePlayedCardsDisplay(state.last_played_cards, state.last_played_by);
+        }
+    }
+    
+    // 更新玩家手牌数量
+    function updatePlayerCardCounts(playerCards) {
+        // 遍历所有玩家的手牌数量
+        Object.keys(playerCards).forEach(playerId => {
+            if (playerId !== userId) {
+                const cardCount = playerCards[playerId];
+                
+                // 找到对应的玩家元素
+                let playerElement;
+                if (playerLeftDiv.dataset.playerId === playerId) {
+                    playerElement = playerLeftDiv;
+                } else if (playerRightDiv.dataset.playerId === playerId) {
+                    playerElement = playerRightDiv;
+                }
+                
+                if (playerElement) {
+                    const cardsElement = playerElement.querySelector('.cards-count');
+                    if (cardsElement) {
+                        cardsElement.textContent = cardCount;
+                    }
+                }
+            }
+        });
+    }
+    
+    // 显示出牌指示器
+    function showPlayedCardIndicator(playerId, action) {
+        let playerElement;
+        
+        if (playerId === userId) {
+            playerElement = playerYouDiv;
+        } else if (playerLeftDiv.dataset.playerId === playerId) {
+            playerElement = playerLeftDiv;
+        } else if (playerRightDiv.dataset.playerId === playerId) {
+            playerElement = playerRightDiv;
+        }
+        
+        if (playerElement) {
+            const indicator = playerElement.querySelector('.played-card-indicator');
+            if (indicator) {
+                indicator.textContent = action === 'play' ? '出牌' : '不出';
+                indicator.className = `played-card-indicator active ${action === 'play' ? 'play' : 'pass'}`;
+                
+                // 2秒后移除active类
+                setTimeout(() => {
+                    indicator.className = 'played-card-indicator';
+                }, 2000);
             }
         }
     }
@@ -198,25 +490,25 @@ document.addEventListener('DOMContentLoaded', () => {
         // 更新其他玩家信息
         if (others.length > 0) {
             const player1 = others[0];
-            const player1Cards = playerLeft.querySelector('.cards-opponent');
+            const player1Cards = playerLeftDiv.querySelector('.cards-opponent');
             player1Cards.textContent = player1.card_count || 0;
             
             if (player1.is_landlord) {
-                playerLeft.classList.add('is-landlord');
+                playerLeftDiv.classList.add('is-landlord');
             } else {
-                playerLeft.classList.remove('is-landlord');
+                playerLeftDiv.classList.remove('is-landlord');
             }
         }
         
         if (others.length > 1) {
             const player2 = others[1];
-            const player2Cards = playerRight.querySelector('.cards-opponent');
+            const player2Cards = playerRightDiv.querySelector('.cards-opponent');
             player2Cards.textContent = player2.card_count || 0;
             
             if (player2.is_landlord) {
-                playerRight.classList.add('is-landlord');
+                playerRightDiv.classList.add('is-landlord');
             } else {
-                playerRight.classList.remove('is-landlord');
+                playerRightDiv.classList.remove('is-landlord');
             }
         }
     }
@@ -240,7 +532,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 显示手牌
     function displayHand() {
-        myHandContainer.innerHTML = '';
+        playerYouDiv.querySelector('.cards-hand').innerHTML = '';
         
         myCards.forEach((card, index) => {
             const cardElement = document.createElement('div');
@@ -283,7 +575,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 toggleCardSelection(cardElement, card);
             });
             
-            myHandContainer.appendChild(cardElement);
+            playerYouDiv.querySelector('.cards-hand').appendChild(cardElement);
         });
     }
 
@@ -365,76 +657,113 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 处理玩家出牌
     function handleCardsPlayed(data) {
-        const { player_id, cards } = data;
+        const { player, cards } = data;
         
-        // 更新已出牌区域
-        updatePlayedCardsDisplay(cards);
+        console.log('处理出牌:', player, cards);
         
-        // 更新玩家手牌数量
-        updatePlayerCardCount(player_id, data.remaining_count);
+        // 更新出牌区域
+        updatePlayedCardsDisplay(cards, player);
         
         // 如果是自己出的牌，从手牌中移除
-        if (player_id === userId) {
+        if (player === userId) {
             removeCardsFromHand(cards);
         }
         
-        // 更新记牌器
-        if (data.card_tracker) {
-            updateCardTracker(data.card_tracker);
+        // 更新玩家手牌数量（如果后端提供了这个信息）
+        if (data.player_cards) {
+            updatePlayerCardCounts(data.player_cards);
         }
         
-        // 显示出牌信息
-        showPlayedCardIndicator(player_id, '出牌');
+        // 更新记牌器
+        updateCardTracker(cards);
+        
+        // 显示出牌指示器
+        showPlayedCardIndicator(player, 'play');
+        
+        // 显示谁出了什么牌
+        let playerName = player;
+        if (player === userId) {
+            playerName = "你";
+        } else {
+            const playerElement = document.querySelector(`[data-player-id="${player}"] .player-name`);
+            if (playerElement) {
+                playerName = playerElement.textContent;
+            }
+        }
+        
+        showMessage(`${playerName} 出牌：${cards.length}张`);
     }
-
+    
     // 处理玩家不出
     function handlePlayerPassed(data) {
-        const { player_id } = data;
+        const { player, action } = data;
         
-        // 显示不出信息
-        showPlayedCardIndicator(player_id, '不出');
-    }
-
-    // 显示出牌/不出信息
-    function showPlayedCardIndicator(playerId, action) {
-        let playerDiv;
-        
-        if (playerId === userId) {
-            playerDiv = playerYouDiv;
-        } else {
-            const players = gameState.players;
-            const playerIndex = players.findIndex(p => p.id === playerId);
+        // 如果是出牌阶段的不出
+        if (action === 'play') {
+            // 清空该玩家的出牌区域
+            const playedCardsDisplay = document.getElementById('played-cards-display');
             
-            if (playerIndex === 1) {
-                playerDiv = playerLeft;
-            } else if (playerIndex === 2) {
-                playerDiv = playerRight;
+            // 显示谁不出
+            let playerName = player;
+            if (player === userId) {
+                playerName = "你";
+            } else {
+                const playerElement = document.querySelector(`[data-player-id="${player}"] .player-name`);
+                if (playerElement) {
+                    playerName = playerElement.textContent;
+                }
             }
-        }
-        
-        if (playerDiv) {
-            const indicator = playerDiv.querySelector('.played-card-indicator');
-            if (indicator) {
-                indicator.textContent = action;
-                
-                // 3秒后清除
-                setTimeout(() => {
-                    indicator.textContent = '';
-                }, 3000);
-            }
+            
+            showMessage(`${playerName} 不出`);
         }
     }
 
-    // 从手牌中移除已出的牌
-    function removeCardsFromHand(cards) {
-        // 将已出的牌转换为JSON字符串进行比较
-        const cardStrings = cards.map(card => JSON.stringify(card));
+    // 从手牌中移除出的牌
+    function removeCardsFromHand(cardsToRemove) {
+        // 深拷贝一份手牌
+        const newHand = [...myCards];
         
-        // 过滤掉已出的牌
-        myCards = myCards.filter(card => !cardStrings.includes(JSON.stringify(card)));
+        // 对于每张要移除的牌
+        cardsToRemove.forEach(cardToRemove => {
+            // 找到这张牌在手牌中的索引
+            let cardIndex = -1;
+            
+            // 处理不同格式的卡牌
+            if (typeof cardToRemove === 'object' && cardToRemove !== null) {
+                // 对象格式的卡牌
+                for (let i = 0; i < newHand.length; i++) {
+                    const handCard = newHand[i];
+                    if (typeof handCard === 'object' && 
+                        handCard.suit === cardToRemove.suit && 
+                        handCard.rank === cardToRemove.rank) {
+                        cardIndex = i;
+                        break;
+                    }
+                }
+            } else if (typeof cardToRemove === 'string') {
+                // 字符串格式的卡牌
+                cardIndex = newHand.indexOf(cardToRemove);
+            }
+            
+            // 如果找到了这张牌，从手牌中移除
+            if (cardIndex !== -1) {
+                newHand.splice(cardIndex, 1);
+            }
+        });
+        
+        // 更新手牌
+        myCards = newHand;
         
         // 重新显示手牌
         displayHand();
+        
+        // 清空已选择的牌
+        selectedCards = [];
+        
+        // 更新出牌按钮状态
+        if (isMyTurn) {
+            playCardsBtn.disabled = selectedCards.length === 0;
+        }
     }
 
     // 更新玩家手牌数量
@@ -445,130 +774,66 @@ document.addEventListener('DOMContentLoaded', () => {
         const playerIndex = players.findIndex(p => p.id === playerId);
         
         if (playerIndex === 1) {
-            const cardCount = playerLeft.querySelector('.cards-opponent');
+            const cardCount = playerLeftDiv.querySelector('.cards-opponent');
             cardCount.textContent = count;
         } else if (playerIndex === 2) {
-            const cardCount = playerRight.querySelector('.cards-opponent');
+            const cardCount = playerRightDiv.querySelector('.cards-opponent');
             cardCount.textContent = count;
         }
     }
 
     // 更新已出牌区域
-    function updatePlayedCardsDisplay(cards) {
+    function updatePlayedCardsDisplay(cards, playerId) {
+        const playedCardsDisplay = document.getElementById('played-cards-display');
         playedCardsDisplay.innerHTML = '';
         
         if (!cards || cards.length === 0) return;
         
+        // 添加玩家标识
+        if (playerId) {
+            let playerName = playerId;
+            if (playerId === userId) {
+                playerName = "你";
+            } else {
+                const playerElement = document.querySelector(`[data-player-id="${playerId}"] .player-name`);
+                if (playerElement) {
+                    playerName = playerElement.textContent;
+                }
+            }
+            
+            const playerLabel = document.createElement('div');
+            playerLabel.className = 'played-cards-player';
+            playerLabel.textContent = playerName;
+            playedCardsDisplay.appendChild(playerLabel);
+        }
+        
+        // 显示出的牌
         cards.forEach(card => {
             const cardElement = document.createElement('div');
-            cardElement.className = 'card';
-            cardElement.textContent = getCardDisplay(card);
-            
-            // 根据卡牌类型设置颜色
-            let isRed = false;
-            
-            if (typeof card === 'object' && card !== null) {
-                isRed = card.suit === 'hearts' || card.suit === 'diamonds' || 
-                        card.suit === '♥' || card.suit === '♦' || 
-                        (card.suit === 'Joker' && card.rank === 'Red');
-            } else if (typeof card === 'string') {
-                isRed = card.includes('hearts') || card.includes('diamonds') || card.includes('red_joker');
-            }
-            
-            if (isRed) {
-                cardElement.style.color = 'red';
-            }
-            
-            // 设置大小王样式
-            if ((typeof card === 'object' && card.suit === 'Joker') || 
-                (typeof card === 'string' && card.includes('joker'))) {
-                cardElement.classList.add(
-                    (card.rank === 'Red' || card.includes('red')) ? 'red-joker' : 'black-joker'
-                );
-            }
-            
+            cardElement.className = 'card played-card';
+            cardElement.innerHTML = getCardDisplay(card);
             playedCardsDisplay.appendChild(cardElement);
         });
     }
 
     // 更新地主牌显示
     function updateLandlordCards(cards) {
+        const landlordCardsDisplay = document.getElementById('landlord-cards-display');
         landlordCardsDisplay.innerHTML = '';
         
         if (!cards || cards.length === 0) return;
         
+        // 清除之前可能存在的地主牌
+        const existingLandlordCards = document.querySelectorAll('.landlord-card');
+        existingLandlordCards.forEach(card => card.remove());
+        
+        // 显示新的地主牌
         cards.forEach(card => {
             const cardElement = document.createElement('div');
-            cardElement.className = 'card';
-            cardElement.textContent = getCardDisplay(card);
-            
-            // 根据卡牌类型设置颜色
-            let isRed = false;
-            
-            if (typeof card === 'object' && card !== null) {
-                isRed = card.suit === 'hearts' || card.suit === 'diamonds' || 
-                        card.suit === '♥' || card.suit === '♦' || 
-                        (card.suit === 'Joker' && card.rank === 'Red');
-            } else if (typeof card === 'string') {
-                isRed = card.includes('hearts') || card.includes('diamonds') || card.includes('red_joker');
-            }
-            
-            if (isRed) {
-                cardElement.style.color = 'red';
-            }
-            
-            // 设置大小王样式
-            if ((typeof card === 'object' && card.suit === 'Joker') || 
-                (typeof card === 'string' && card.includes('joker'))) {
-                cardElement.classList.add(
-                    (card.rank === 'Red' || card.includes('red')) ? 'red-joker' : 'black-joker'
-                );
-            }
-            
+            cardElement.className = 'card landlord-card';
+            cardElement.innerHTML = getCardDisplay(card);
             landlordCardsDisplay.appendChild(cardElement);
         });
-    }
-
-    // 更新记牌器
-    function updateCardTracker(tracker) {
-        cardTracker.innerHTML = '';
-        
-        if (!tracker) return;
-        
-        const suits = ['spades', 'hearts', 'clubs', 'diamonds'];
-        const values = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
-        
-        // 添加普通牌
-        for (const value of values) {
-            for (const suit of suits) {
-                const key = `${value}_of_${suit}`;
-                const isOut = tracker[key] === 0;
-                
-                const trackerItem = document.createElement('div');
-                trackerItem.className = `tracker-item${isOut ? ' out-of-play' : ''}`;
-                trackerItem.textContent = `${value}${getSuitSymbol(suit)}`;
-                
-                if (suit === 'hearts' || suit === 'diamonds') {
-                    trackerItem.style.color = 'red';
-                }
-                
-                cardTracker.appendChild(trackerItem);
-            }
-        }
-        
-        // 添加大小王
-        const redJokerKey = 'red_joker';
-        const blackJokerKey = 'black_joker';
-        
-        const redJokerItem = document.createElement('div');
-        redJokerItem.className = `tracker-item is-king is-red-joker${tracker[redJokerKey] === 0 ? ' out-of-play' : ''}`;
-        redJokerItem.textContent = '大王';
-        cardTracker.appendChild(redJokerItem);
-        
-        const blackJokerItem = document.createElement('div');
-        blackJokerItem.className = `tracker-item is-king${tracker[blackJokerKey] === 0 ? ' out-of-play' : ''}`;
-        blackJokerItem.textContent = '小王';
-        cardTracker.appendChild(blackJokerItem);
     }
 
     // 处理游戏结束
@@ -617,19 +882,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 发送聊天消息
     function sendChatMessage() {
+        const chatInput = document.getElementById('chat-input');
+        if (!chatInput) return;
+        
         const message = chatInput.value.trim();
-        
-        if (!message) return;
-        
-        websocket.send(JSON.stringify({
-            action: 'chat',
-            user_id: userId,
-            room_id: roomId,
-            message
-        }));
-        
-        // 清空输入框
-        chatInput.value = '';
+        if (message && websocket) {
+            websocket.send(JSON.stringify({
+                action: 'chat',
+                user_id: userId,
+                room_id: roomId,
+                message: message
+            }));
+            chatInput.value = '';
+        }
     }
 
     // 离开房间
@@ -753,34 +1018,33 @@ document.addEventListener('DOMContentLoaded', () => {
     function makeDraggable(element) {
         let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
         
-        element.onmousedown = dragMouseDown;
+        // 获取元素的头部，如果存在
+        const header = element.querySelector('.chat-header') || element;
+        
+        if (header) {
+            header.onmousedown = dragMouseDown;
+        }
         
         function dragMouseDown(e) {
             e = e || window.event;
             e.preventDefault();
-            
             // 获取鼠标位置
             pos3 = e.clientX;
             pos4 = e.clientY;
-            
             document.onmouseup = closeDragElement;
+            // 鼠标移动时调用函数
             document.onmousemove = elementDrag;
-            
-            // 改变光标样式
-            element.style.cursor = 'grabbing';
         }
         
         function elementDrag(e) {
             e = e || window.event;
             e.preventDefault();
-            
             // 计算新位置
             pos1 = pos3 - e.clientX;
             pos2 = pos4 - e.clientY;
             pos3 = e.clientX;
             pos4 = e.clientY;
-            
-            // 设置元素新位置
+            // 设置元素的新位置
             element.style.top = (element.offsetTop - pos2) + "px";
             element.style.left = (element.offsetLeft - pos1) + "px";
         }
@@ -789,9 +1053,6 @@ document.addEventListener('DOMContentLoaded', () => {
             // 停止移动
             document.onmouseup = null;
             document.onmousemove = null;
-            
-            // 恢复光标样式
-            element.style.cursor = 'grab';
         }
     }
 
@@ -817,6 +1078,15 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'your_turn_to_bid':
                 handleBidding();
                 break;
+            case 'your_turn_to_play':
+                handleYourTurnToPlay(data);
+                break;
+            case 'update_hand':
+                handleUpdateHand(data.hand);
+                break;
+            case 'landlord_decided':
+                handleLandlordDecided(data);
+                break;
             case 'cards_played':
                 handleCardsPlayed(data);
                 break;
@@ -829,28 +1099,208 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'chat_message':
                 handleChatMessage(data);
                 break;
+            case 'player_cards_update':
+                updatePlayerCardCounts(data.player_cards);
+                break;
             case 'error':
                 alert(data.message);
                 break;
             // 其他消息类型处理...
         }
     }
-
-    // 事件监听
-    startGameBtn.addEventListener('click', startGame);
-    leaveRoomBtn.addEventListener('click', leaveRoom);
-    addBotBtn.addEventListener('click', addBot);
-    playCardsBtn.addEventListener('click', playCards);
-    passBtn.addEventListener('click', passPlay);
-    sendChatBtn.addEventListener('click', sendChatMessage);
     
-    // 按Enter键发送消息
-    chatInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            sendChatMessage();
+    // 更新玩家手牌数量
+    function updatePlayerCardCounts(playerCards) {
+        // 遍历所有玩家的手牌数量
+        Object.keys(playerCards).forEach(playerId => {
+            if (playerId !== userId) {
+                const cardCount = playerCards[playerId];
+                
+                // 找到对应的玩家元素
+                let playerElement;
+                if (document.querySelector(`#player-left[data-player-id="${playerId}"]`)) {
+                    playerElement = document.querySelector(`#player-left[data-player-id="${playerId}"]`);
+                } else if (document.querySelector(`#player-right[data-player-id="${playerId}"]`)) {
+                    playerElement = document.querySelector(`#player-right[data-player-id="${playerId}"]`);
+                }
+                
+                if (playerElement) {
+                    const cardsElement = playerElement.querySelector('.cards-opponent');
+                    if (cardsElement) {
+                        cardsElement.textContent = cardCount;
+                    }
+                }
+            }
+        });
+    }
+    
+    // 处理手牌更新
+    function handleUpdateHand(hand) {
+        myCards = hand;
+        displayHand();
+    }
+    
+    // 处理地主确定
+    function handleLandlordDecided(data) {
+        const { landlord, landlord_cards } = data;
+        
+        // 更新地主牌显示
+        updateLandlordCards(landlord_cards);
+        
+        // 更新玩家状态
+        if (landlord === userId) {
+            playerYouDiv.classList.add('is-landlord');
+        } else if (landlord.startsWith('bot_')) {
+            // 找到是哪个机器人成为地主
+            const botElements = document.querySelectorAll('.player-opponent');
+            botElements.forEach(element => {
+                if (element.dataset.playerId === landlord) {
+                    element.classList.add('is-landlord');
+                }
+            });
         }
-    });
-
-    // 初始化页面
-    initializePage();
-}); 
+        
+        // 显示提示（不使用弹窗）
+        if (landlord === userId) {
+            showMessage("你成为了地主！");
+        } else {
+            const landlordName = document.querySelector(`[data-player-id="${landlord}"] .player-name`).textContent;
+            showMessage(`${landlordName} 成为了地主！`);
+        }
+    }
+    
+    // 显示消息（不使用弹窗）
+    function showMessage(message) {
+        // 可以添加一个临时消息显示区域
+        const messageElement = document.createElement('div');
+        messageElement.className = 'game-message';
+        messageElement.textContent = message;
+        document.getElementById('center-area').appendChild(messageElement);
+        
+        // 3秒后自动移除
+        setTimeout(() => {
+            messageElement.remove();
+        }, 3000);
+    }
+    
+    // 处理轮到自己出牌
+    function handleYourTurnToPlay(data) {
+        isMyTurn = true;
+        
+        // 启用出牌按钮
+        playCardsBtn.disabled = selectedCards.length === 0;
+        passBtn.disabled = false;
+        
+        // 显示出牌提示和计时器
+        turnIndicator.classList.remove('hidden');
+        startTimer();
+    }
+    
+    // 开始计时器
+    function startTimer() {
+        // 重置计时器
+        if (turnTimer) {
+            clearInterval(turnTimer);
+        }
+        
+        timeLeft = 20;
+        timerElement.textContent = timeLeft;
+        
+        turnTimer = setInterval(() => {
+            timeLeft--;
+            timerElement.textContent = timeLeft;
+            
+            if (timeLeft <= 0) {
+                clearInterval(turnTimer);
+                // 时间到，自动不出
+                if (isMyTurn) {
+                    passPlay();
+                }
+            }
+        }, 1000);
+    }
+    
+    // 停止计时器
+    function stopTimer() {
+        if (turnTimer) {
+            clearInterval(turnTimer);
+            turnTimer = null;
+        }
+        turnIndicator.classList.add('hidden');
+    }
+    
+    // 更新出牌区域
+    function updatePlayedCardsDisplay(cards, playerId) {
+        const playedCardsDisplay = document.getElementById('played-cards-display');
+        playedCardsDisplay.innerHTML = '';
+        
+        if (!cards || cards.length === 0) return;
+        
+        // 添加玩家标识
+        if (playerId) {
+            let playerName = playerId;
+            if (playerId === userId) {
+                playerName = "你";
+            } else {
+                const playerElement = document.querySelector(`[data-player-id="${playerId}"] .player-name`);
+                if (playerElement) {
+                    playerName = playerElement.textContent;
+                }
+            }
+            
+            const playerLabel = document.createElement('div');
+            playerLabel.className = 'played-cards-player';
+            playerLabel.textContent = playerName;
+            playedCardsDisplay.appendChild(playerLabel);
+        }
+        
+        // 显示出的牌
+        cards.forEach(card => {
+            const cardElement = document.createElement('div');
+            cardElement.className = 'card played-card';
+            cardElement.innerHTML = getCardDisplay(card);
+            playedCardsDisplay.appendChild(cardElement);
+        });
+    }
+    
+    // 出牌
+    function playCards() {
+        if (!isMyTurn || selectedCards.length === 0) return;
+        
+        console.log('尝试出牌:', selectedCards);
+        
+        websocket.send(JSON.stringify({
+            action: 'play',
+            cards: selectedCards
+        }));
+        
+        // 停止计时器
+        stopTimer();
+        
+        // 重置状态
+        isMyTurn = false;
+        
+        // 禁用按钮
+        playCardsBtn.disabled = true;
+        passBtn.disabled = true;
+    }
+    
+    // 不出
+    function passPlay() {
+        if (!isMyTurn) return;
+        
+        websocket.send(JSON.stringify({
+            action: 'pass'
+        }));
+        
+        // 停止计时器
+        stopTimer();
+        
+        // 重置状态
+        isMyTurn = false;
+        selectedCards = [];
+        
+        // 禁用按钮
+        playCardsBtn.disabled = true;
+        passBtn.disabled = true;
+    }
