@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>斗地主 - 游戏大厅</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <div id="lobby" class="view active">
+            <div class="lobby-container">
+                <h1 class="game-title">斗地主游戏大厅</h1>
+                
+                <div class="room-controls">
+                    <div class="room-input-group">
+                        <input type="text" id="player-name-input" placeholder="请输入您的昵称" maxlength="10">
+                        <input type="text" id="room-id-input" placeholder="房间ID">
+                        <label class="checkbox-container">
+                            公开房间
+                            <input type="checkbox" id="is-public-checkbox" checked>
+                            <span class="checkmark"></span>
+                        </label>
+                    </div>
+                    
+                    <div class="room-buttons">
+                        <button id="create-room-btn" class="btn-primary">创建房间</button>
+                        <button id="join-room-btn" class="btn-primary">加入房间</button>
+                    </div>
+                </div>
+                
+                <div class="public-rooms-section">
+                    <h2>公开房间</h2>
+                    <div id="public-rooms-list">
+                        <!-- 公开房间列表将在这里显示 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/lobby.js"></script>
+</body>
+</html>

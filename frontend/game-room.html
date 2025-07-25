@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>斗地主 - 游戏房间</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <div id="game-room" class="view active">
+            <div id="card-tracker-container">
+                <h3>记牌器</h3>
+                <div id="card-tracker"></div>
+            </div>
+            <div class="container">
+                <!-- Game room content -->
+                <div id="game-header">
+                    <h1>房间: <span id="room-id-display"></span></h1>
+                    <div id="game-actions">
+                        <button id="start-game-btn" class="game-btn">开始游戏</button>
+                        <button id="add-bot-btn" class="game-btn">添加机器人</button>
+                        <button id="leave-room-btn" class="game-btn leave-btn">离开房间</button>
+                    </div>
+                </div>
+                
+                <div id="main-game-area">
+                    <!-- 左侧玩家 -->
+                    <div id="player-left" class="player player-opponent">
+                        <div class="player-name">玩家1</div>
+                        <div class="player-info">
+                            <div class="cards-opponent">17</div>
+                            <div class="played-card-indicator"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 右侧玩家 -->
+                    <div id="player-right" class="player player-opponent">
+                        <div class="player-name">玩家2</div>
+                        <div class="player-info">
+                            <div class="cards-opponent">17</div>
+                            <div class="played-card-indicator"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 中心区域 -->
+                    <div id="center-area">
+                        <div id="landlord-cards-display">
+                            <!-- Landlord's 3 cards will be displayed here -->
+                        </div>
+                        
+                        <div id="played-cards-display">
+                            <!-- Last played cards will be displayed here -->
+                        </div>
+                    </div>
+                    
+                    <!-- 底部玩家（你） -->
+                    <div id="player-you" class="player">
+                        <div class="player-name">你</div>
+                        <div id="controls">
+                            <button id="play-cards-btn" class="game-btn action-btn" disabled>出牌</button>
+                            <button id="pass-btn" class="game-btn action-btn" disabled>不出</button>
+                        </div>
+                        <div class="cards-hand">
+                            <!-- Player's hand will be displayed here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="chat-container">
+                <div id="chat-messages"></div>
+                <div id="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="输入消息...">
+                    <button id="send-chat-btn" class="game-btn">发送</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="js/game-room.js"></script>
+</body>
+</html> 
